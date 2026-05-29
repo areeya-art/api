@@ -46,7 +46,7 @@ h1 { font-size: 18px; font-weight: 600; margin-bottom: 1.5rem; color: #1a1a1a; }
 .no-fill-tag { background: #f5f5f5; border-radius: 8px; padding: 6px 12px; font-size: 13px; color: #666; }
 .export-row { display: none; gap: 8px; margin-top: 1rem; }
 .note { font-size: 12px; color: #888; margin-top: 8px; }
-.error { color: #dc2626; font-size: 13px; padding: 1rem; background: #fef2f2; border-radius: 8px; }
+.error { color: #dc2626; font-size: 13px; padding: 1rem; background: #fef2f2; border-radius: 8px; word-break: break-all; }
 @media (max-width: 400px) {
   .stat-grid { grid-template-columns: repeat(2, 1fr); }
   .stat-val { font-size: 18px; }
@@ -124,7 +124,7 @@ async function analyze() {
   }
   content.push({ type: 'text', text: `คุณคือระบบบัญชีน้ำมันรถบริษัท อ่านรูปทั้งหมดแล้วจัดกลุ่มเป็นชุดตามทะเบียนรถ
 ตอบเป็น JSON array เท่านั้น ห้ามมีข้อความอื่น แต่ละชุดมีรูปแบบ:
-[{"car":"ทะเบียนรถ","filled":true/false,"pump":"PTT หรือ บางจาก หรือ Caltex","date":"dd/mm/yy","invoice":"เลข invoice","total":ตัวเลข,"mile_before":ตัวเลข,"mile_after":ตัวเลข,"branch":"สาขา PTT เช่น PTT/RY/CHON","coupon":"เลขคูปองบางจาก","note":"หมายเหตุ"}]
+[{"car":"ทะเบียนรถ","filled":true,"pump":"PTT หรือ บางจาก หรือ Caltex","date":"dd/mm/yy","invoice":"เลข invoice","total":ตัวเลข,"mile_before":ตัวเลข,"mile_after":ตัวเลข,"branch":"สาขา PTT เช่น PTT/RY/CHON","coupon":"เลขคูปองบางจาก","note":"หมายเหตุ"}]
 กฎ: ถ้าไม่มีบิล filled=false และ total/mile เป็น null, PTT อ่านไมล์จากบิล (ลูกระยะทาง KM), บางจาก/Caltex อ่านไมล์จากหน้าปัดที่มีเลขมากกว่า` });
 
   try {
@@ -133,13 +133,25 @@ async function analyze() {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ model: 'claude-sonnet-4-20250514', max_tokens: 2000, messages: [{ role: 'user', content }] })
     });
+
     const data = await res.json();
+
+    if (!res.ok) {
+      throw new Error('Server error ' + res.status + ': ' + (data.error || JSON.stringify(data)));
+    }
+
+    if (!data.content) {
+      throw new Error('Response ผิดรูปแบบ: ' + JSON.stringify(data).substring(0, 200));
+    }
+
     const txt = data.content.map(i => i.text || '').join('').replace(/```json|```/g, '').trim();
     parsed = JSON.parse(txt);
     renderResults(parsed);
+
   } catch(e) {
     document.getElementById('results').innerHTML = '<div class="error">เกิดข้อผิดพลาด: ' + e.message + '</div>';
   }
+
   document.getElementById('loading').style.display = 'none';
   btn.disabled = false;
 }
